@@ -387,6 +387,7 @@ def search_method():
             'search_res': search_res,
             'ctxt': print_ctxt
         })
+    return jsonify({})
 
 
 @app.route('/api/check-modify', methods=['POST'])
