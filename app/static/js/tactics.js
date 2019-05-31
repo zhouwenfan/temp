@@ -163,27 +163,61 @@ function introduction() {
 }
 
 function apply_method(method_name, args) {
+    var count = 0;
+    var sig_list = [];
     var id = get_selected_id();
     var sigs = cells[id].method_sig[method_name];
     var input = current_state();
     input.method_name = method_name;
-
     if (args === undefined)
         args = {};
-
     $.each(sigs, function (i, sig) {
         if (sig in args)
             input[sig] = args[sig];
-        else
-            input[sig] = prompt('Enter ' + sig);
+        else {
+            sig_list.push(sig);
+            count += 1;
+        }
     });
     display_running();
-    $.ajax({
-        url: "/api/apply-method",
-        type: "POST",
-        data: JSON.stringify(input),
-        success: display_checked_proof
-    })
+
+    if (count > 0) {
+        var input_html = '';
+        for (let i = 1; i <= count; i++) {
+            input_html += '<label style="text-align:right;width:15%">' + sig_list[i-1] +
+                          ':</label>&nbsp;<input id="sig-input' + i + '" style="width:70%;"><br>';
+        }
+        swal({
+            title: "Method " + method_name,
+            html: input_html,
+            showCancelButton: true,
+            confirmButtonText: "Confirm",
+            cancelButtonText: "Cancel",
+            closeOnConfirm: false,
+            closeOnCancel: false,
+            preConfirm: () => {
+                for (let i = 1; i <= count; i++) {
+                    input[sig_list[i-1]] = document.getElementById('sig-input' + i).value;
+                }
+            }
+        }).then(function (isConfirm) {
+            if (isConfirm.value) {
+                $.ajax({
+                    url: "/api/apply-method",
+                    type: "POST",
+                    data: JSON.stringify(input),
+                    success: display_checked_proof
+                })
+            }
+        });
+    } else {
+        $.ajax({
+            url: "/api/apply-method",
+            type: "POST",
+            data: JSON.stringify(input),
+            success: display_checked_proof
+        })
+    }
 }
 
 // Split off the first token according to the delimiter.

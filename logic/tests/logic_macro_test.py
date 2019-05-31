@@ -31,7 +31,7 @@ class LogicMacroTest(unittest.TestCase):
             pt = macro.get_proof_term(thy, t, [])
             prf = pt.export()
             self.assertEqual(thy.check_proof(prf), Thm([], t))
-        
+
     def testImpConjMacro(self):
         macro = imp_conj_macro()
         A = Var("A", boolT)
@@ -39,17 +39,20 @@ class LogicMacroTest(unittest.TestCase):
         C = Var("C", boolT)
         D = Var("D", boolT)
         test_data = [
-            imp(conj(A, B), conj(B, A)),
-            imp(conj(conj(A, B), conj(C, D)), conj(B, conj(D, C), B)),
+            (imp(conj(conj(A, conj(D, B), C)), conj(conj(A, D, C), conj(A, B))), True),
+            (imp(conj(C, D), A), False),
+            (imp(conj(A, B), conj(A, conj(B, C))), False),
+            (imp(conj(A, conj(B, C)), conj(A, B)), True),
         ]
 
-        for t in test_data:
-            print("Testing:", printer.print_term(thy, t))
-            pt = macro.get_proof_term(thy, t, [])
-            prf = pt.export()
-            thy.check_proof(prf)
-            print(printer.print_proof(thy, prf))
-            print()
+        for t, res in test_data:
+            if res:
+                pt = macro.get_proof_term(thy, t, [])
+                self.assertEqual(pt, Thm([], t))
+                prf = pt.export()
+                thy.check_proof(prf)
+            else:
+                self.assertRaises(AssertionError, macro.get_proof_term, thy, t, [])
 
     def testImpConjMacroEval(self):
         macro = imp_conj_macro()
@@ -58,15 +61,17 @@ class LogicMacroTest(unittest.TestCase):
         C = Var("C", boolT)
         D = Var("D", boolT)
         test_data = [
-            (imp(conj(A, B), conj(B, A)), True),
-            (imp(conj(A, B), conj(C, A)), False),
+            (imp(conj(conj(A, conj(D, B))), conj(conj(A, D), conj(B, A))), True),
+            (imp(B, C), False),
+            (imp(conj(A, B), conj(A, conj(B, C))), False),
+            (imp(conj(A, conj(B, C)), conj(A, B)), True),
         ]
 
         for t, res in test_data:
             if res:
                 self.assertEqual(macro.eval(thy, t, []), Thm([], t))
             else:
-                self.assertRaises(InvalidDerivationException, macro.eval, thy, t, [])
+                self.assertRaises(AssertionError, macro.eval, thy, t, [])
 
 
 if __name__ == "__main__":

@@ -6,7 +6,8 @@ from kernel.term import Term
 from kernel import macro
 from kernel.proof import Proof
 from kernel.thm import Thm
-from logic import logic, matcher
+from logic import logic, matcher, logic
+from logic.logic import is_conj
 from logic.conv import then_conv, beta_conv, top_conv, rewr_conv, top_sweep_conv
 from logic.proofterm import ProofTerm, ProofTermMacro, ProofTermDeriv, refl
 
@@ -248,6 +249,7 @@ class rewrite_fact_with_prev_macro(ProofTermMacro):
                        top_conv(beta_conv()))
         return pt.on_prop(thy, cv)
 
+
 class trivial_macro(ProofTermMacro):
     """Prove a proposition of the form A_1 --> ... --> A_n --> B, where
     B agrees with one of A_i.
@@ -292,16 +294,53 @@ def apply_theorem(thy, th_name, *pts, concl=None, tyinst=None, inst=None):
         else:
             return ProofTermDeriv("beta_norm", thy, None, [pt])
 
+
 class imp_conj_macro(ProofTermMacro):
     def __init__(self):
         self.level = 1
         self.sig = Term
 
     def eval(self, thy, args, ths):
-        raise NotImplementedError
+        def strip(t):
+            if is_conj(t):
+                return strip(t.arg1).union(strip(t.arg))
+            else:
+                return {t}
+
+        As, C = args.strip_implies()
+        assert len(As) == 1, 'imp_conj_macro'
+        assert strip(C).issubset(strip(As[0])), 'imp_conj_macro'
+        return Thm([], args)
 
     def get_proof_term(self, thy, args, pts):
-        return ProofTerm.assume(args)
+        dct = dict()
+
+        def traverse_A(pt):
+            # Given proof term showing a conjunction, put proof terms
+            # showing atoms of the conjunction in dct.
+            if is_conj(pt.prop):
+                traverse_A(apply_theorem(thy, 'conjD1', pt))
+                traverse_A(apply_theorem(thy, 'conjD2', pt))
+            else:
+                dct[pt.prop] = pt
+
+        def traverse_C(t):
+            # Return proof term with conclusion t
+            if is_conj(t):
+                left = traverse_C(t.arg1)
+                right = traverse_C(t.arg)
+                return apply_theorem(thy, 'conjI', left, right)
+            else:
+                assert t in dct.keys(), 'imp_conj_macro'
+                return dct[t]
+
+        As, C = args.strip_implies()
+        assert len(As) == 1, 'imp_conj_macro'
+        A = As[0]
+
+        traverse_A(ProofTerm.assume(A))
+        concl = traverse_C(C)
+        return ProofTerm.implies_intr(A, concl)
 
 
 macro.global_macros.update({
